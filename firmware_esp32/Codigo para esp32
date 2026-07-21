@@ -1,0 +1,190 @@
+#include <Arduino.h>
+#include <WiFi.h>
+#include <WebServer.h>
+#include <OneWire.h>
+#include <DallasTemperature.h>
+
+// --- Configuración de la Red Wi-Fi Propia (Modo Punto de Acceso Abierto) ---
+const char* ssid = "camara frigorifica"; // Nombre de la red abierta que creará el ESP32
+
+// --- Configuración de Pines del ESP32 ---
+#define PIN_DS18B20 4       // Pin de datos del sensor de temperatura (con resistencia de 4.7k)
+
+// --- Instancias de las Librerías ---
+OneWire oneWire(PIN_DS18B20);
+DallasTemperature sensores(&oneWire);
+WebServer server(80); // Servidor web en el puerto estándar 80
+
+// --- Código HTML, CSS y JS de la Página Web ---
+const char PAGINA_WEB[] PROGMEM = R"=====(
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cámara Frigorífica - Monitoreo</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f7f6;
+            color: #333;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }
+        .card {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            text-align: center;
+            max-width: 400px;
+            width: 90%;
+        }
+        h1 {
+            color: #2c3e50;
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+        h2 {
+            color: #7f8c8d;
+            font-size: 14px;
+            font-weight: 400;
+            margin-top: 0;
+            margin-bottom: 25px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .temp-display {
+            font-size: 64px;
+            font-weight: bold;
+            color: #3498db;
+            margin: 20px 0;
+            transition: color 0.5s ease;
+        }
+        .unidad {
+            font-size: 28px;
+            font-weight: normal;
+            color: #7f8c8d;
+        }
+        .estado {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            background-color: #2ecc71;
+            color: white;
+        }
+        .footer {
+            margin-top: 25px;
+            font-size: 11px;
+            color: #bdc3c7;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>Cámara Frigorífica</h1>
+        <h2>Monitoreo Directo (Sin Internet)</h2>
+        
+        <div class="temp-display" id="temp-val">--.-<span class="unidad">°C</span></div>
+        
+        <span class="estado" id="status-badge">Conectando...</span>
+        
+        <div class="footer">
+            UNET - Ingeniería Electrónica
+        </div>
+    </div>
+
+    <script>
+        // Consultar la temperatura cada 1 segundo
+        setInterval(function() {
+            fetch('/get-temp')
+                .then(response => response.text())
+                .then(data => {
+                    const tempElement = document.getElementById('temp-val');
+                    const badge = document.getElementById('status-badge');
+                    
+                    if (data === "ERROR") {
+                        tempElement.innerHTML = "ERR<span class='unidad'>--</span>";
+                        tempElement.style.color = "#e74c3c";
+                        badge.innerHTML = "Error Sensor";
+                        badge.style.backgroundColor = "#e74c3c";
+                    } else {
+                        const tempVal = parseFloat(data).toFixed(1);
+                        tempElement.innerHTML = tempVal + "<span class='unidad'>°C</span>";
+                        badge.innerHTML = "Conectado al ESP32";
+                        badge.style.backgroundColor = "#2ecc71";
+                        
+                        if (tempVal <= 10) {
+                            tempElement.style.color = "#2980b9"; // Azul frío
+                        } else if (tempVal > 10 && tempVal < 25) {
+                            tempElement.style.color = "#27ae60"; // Verde templado
+                        } else {
+                            tempElement.style.color = "#d35400"; // Naranja cálido
+                        }
+                    }
+                })
+                .catch(err => {
+                    document.getElementById('status-badge').innerHTML = "Desconectado";
+                    document.getElementById('status-badge').style.backgroundColor = "#7f8c8d";
+                });
+        }, 1000);
+    </script>
+</body>
+</html>
+)=====";
+
+void manejarRaiz() {
+  server.send(200, "text/html", PAGINA_WEB);
+}
+
+void enviarTemperatura() {
+  sensores.requestTemperatures();
+  float temp = sensores.getTempCByIndex(0);
+  
+  if (temp == DEVICE_DISCONNECTED_C) {
+    server.send(200, "text/plain", "ERROR");
+  } else {
+    server.send(200, "text/plain", String(temp, 2));
+  }
+}
+
+void setup() {
+  Serial.begin(115200);
+  delay(1500);
+
+  // Inicializar sensor DS18B20
+  sensores.begin();
+
+  // Configurar el ESP32 en modo Punto de Acceso (AP) sin contraseña (red abierta)
+  Serial.println("\nIniciando Punto de Acceso Abierto...");
+  WiFi.softAP(ssid, NULL); // Al pasar NULL, la red queda libre y sin clave
+
+  // Obtener la dirección IP del ESP32 en su red propia
+  IPAddress IP = WiFi.softAPIP();
+  
+  Serial.println("--- RED CREADA CON EXITO ---");
+  Serial.print("Nombre de Red (SSID): ");
+  Serial.println(ssid);
+  Serial.println("Contraseña: [RED ABIERTA / SIN CLAVE]");
+  Serial.print("Dirección IP de la página: ");
+  Serial.println(IP); // Por defecto: 192.168.4.1
+  
+  // Configurar las rutas del servidor
+  server.on("/", manejarRaiz);
+  server.on("/get-temp", enviarTemperatura);
+
+  // Iniciar servidor
+  server.begin();
+  Serial.println("Servidor Web HTTP iniciado correctamente.");
+}
+
+void loop() {
+  server.handleClient();
+}
