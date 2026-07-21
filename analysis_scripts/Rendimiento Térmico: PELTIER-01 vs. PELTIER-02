@@ -1,0 +1,23 @@
+% --- Gráfica: Rendimiento Térmico: PELTIER-01 vs. PELTIER-02 ---
+
+% 1. Tiempo de las tomas (0 a 30 minutos)
+tiempo = [0, 10, 20, 30]; 
+
+% 2. Valores exactos tomados de la gráfica
+peltier_01 = [11.1, 10.7, 10.5, 10.2]; % Izquierda (Disipador cuadrado)
+peltier_02 = [15.0, 14.7, 14.2, 13.9]; % Derecha (Disipador redondo)
+
+% 3. Crear la figura y graficar ambas curvas
+figure;
+plot(tiempo, peltier_01, '-o', 'LineWidth', 2, 'Color', [0.95, 0.0, 0.5]); % Fucsia
+hold on;
+plot(tiempo, peltier_02, '-s', 'LineWidth', 2, 'Color', [0.0, 0.5, 0.8]);  % Azul
+hold off;
+
+% 4. Personalización estética del gráfico
+title('Rendimiento Térmico: PELTIER-01 vs. PELTIER-02');
+xlabel('Tiempo (Minutos)');
+ylabel('Temperatura de Cara Fría (°C)');
+set(gca, 'XTick', [0, 10, 20, 30]);
+legend('PELTIER-01', 'PELTIER-02', 'Location', 'northeast');
+grid on;
