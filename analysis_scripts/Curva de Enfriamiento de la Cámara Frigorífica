@@ -1,0 +1,23 @@
+% --- Gráfica: Curva de Enfriamiento de la Cámara Frigorífica ---
+
+% 1. Tiempo de las tomas (0 a 30 minutos)
+tiempo = [0, 10, 20, 30]; 
+
+% 2. Valores exactos tomados de la gráfica
+sensor_centro = [25.1, 24.0, 23.1, 23.1]; % Naranja con círculos
+sensor_pared  = [25.9, 24.5, 24.1, 23.8]; % Azul con cuadrados
+
+% 3. Crear la figura y graficar ambas curvas
+figure;
+plot(tiempo, sensor_centro, '-o', 'LineWidth', 2, 'Color', [0.85, 0.33, 0.1]); % Naranja
+hold on;
+plot(tiempo, sensor_pared, '-s', 'LineWidth', 2, 'Color', [0.0, 0.45, 0.74]);  % Azul
+hold off;
+
+% 4. Personalización estética del gráfico
+title('Curva de Enfriamiento de la Cámara Frigorífica');
+xlabel('Tiempo (Minutos)');
+ylabel('Temperatura (°C)');
+set(gca, 'XTick', [0, 10, 20, 30]);
+legend('Sensor Centro', 'Sensor Pared', 'Location', 'northeast');
+grid on;
